@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Search Lirik Danzz</title>
+    <link href="https://googleapis.com" rel="stylesheet">
+    <style>
+        :root {
+            --bg: #050505; --card: rgba(255,255,255,0.03); --border: rgba(255,255,255,0.08); --text: #ffffff; --sub: #666; --ease: cubic-bezier(0.2, 1, 0.2, 1);
+        }
+        [data-theme="light"] {
+            --bg: #f5f5f7; --card: rgba(0,0,0,0.02); --border: rgba(0,0,0,0.05); --text: #111111; --sub: #999;
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        /* FIX: Mengubah tinggi menjadi min-height agar bisa discroll */
+        body { 
+            background: var(--bg); 
+            color: var(--text); 
+            font-family: 'Plus Jakarta Sans', sans-serif; 
+            min-height: 100vh; 
+            transition: 0.8s var(--ease); 
+        }
+
+        .bg-mesh { position: fixed; inset: 0; z-index: -1; opacity: 0.4; filter: blur(100px); }
+        .blob { position: absolute; width: 60vw; height: 60vw; border-radius: 50%; animation: drift 20s infinite alternate; background: linear-gradient(45deg, #1a1a1a, #333); }
+        @keyframes drift { from { transform: translate(-10%, -10%); } to { transform: translate(10%, 10%); } }
+
+        .theme-btn { 
+            position: fixed; top: 30px; right: 30px; z-index: 100; 
+            background: var(--card); border: 1px solid var(--border); 
+            color: var(--text); padding: 12px 24px; border-radius: 50px; 
+            font-size: 10px; font-weight: 800; letter-spacing: 2px; 
+            cursor: pointer; backdrop-filter: blur(10px); 
+            text-transform: uppercase;
+        }
+
+        #dashboard { width: 90%; max-width: 500px; margin: auto; padding-top: 10vh; transition: 0.8s var(--ease); }
+        h1 { font-size: 3.5rem; font-weight: 800; letter-spacing: -4px; line-height: 0.9; margin-bottom: 40px; }
+        .search-bar { width: 100%; background: var(--card); border: 1px solid var(--border); padding: 22px 25px; border-radius: 20px; color: var(--text); font-size: 14px; margin-bottom: 30px; backdrop-filter: blur(10px); font-family: inherit; }
+        .search-bar:focus { outline: none; border-color: var(--text); }
+
+        /* FIX: Scrollbar lebih user-friendly */
+        .list { max-height: 60vh; overflow-y: auto; padding-right: 10px; }
+        .list::-webkit-scrollbar { width: 4px; }
+        .list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+
+        .card { background: var(--card); border: 1px solid var(--border); padding: 25px; border-radius: 25px; margin-bottom: 12px; cursor: pointer; transition: 0.4s var(--ease); display: flex; justify-content: space-between; align-items: center; }
+        .card:hover { transform: translateY(-5px); border-color: var(--text); background: rgba(255,255,255,0.05); }
+        .card h3 { font-size: 16px; font-weight: 600; letter-spacing: -0.5px; }
+        .card p { font-size: 10px; color: var(--sub); text-transform: uppercase; letter-spacing: 2px; margin-top: 5px; }
+
+        #player { position: fixed; inset: 0; display: none; z-index: 1000; flex-direction: column; justify-content: center; align-items: center; padding: 40px; background: var(--bg); }
+        #stage { width: 100%; max-width: 700px; display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 12px; text-align: center; }
+        .word { display: inline-block; white-space: nowrap; }
+        .char { display: inline-block; opacity: 0; transform: translateY(30px); filter: blur(15px); transition: 1s var(--ease); font-size: clamp(1.5rem, 8vw, 2.5rem); font-weight: 200; }
+        .char.reveal { opacity: 1; transform: translateY(0); filter: blur(0); }
+        .char.exit { opacity: 0; transform: translateY(-30px); filter: blur(10px); }
+
+        .controls { position: absolute; bottom: 80px; display: flex; gap: 15px; }
+        .btn { background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 15px 30px; border-radius: 100px; font-size: 10px; letter-spacing: 3px; cursor: pointer; text-transform: uppercase; transition: 0.3s; font-weight: 800; }
+        .btn:hover { background: var(--text); color: var(--bg); }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div class="bg-mesh"><div class="blob"></div></div>
+    <button class="theme-btn" id="theme-toggle" onclick="toggleTheme()">TERANG</button>
+
+    <div id="dashboard">
+        <p style="font-size: 10px; letter-spacing: 5px; opacity: 0.3; margin-bottom: 10px;">LYRICS DIRECTORY</p>
+        <h1>Search<br>Lirik Danzz.</h1>
+        <input type="text" class="search-bar" id="search" placeholder="Cari lagu atau artis..." onkeyup="filter()">
+        <div id="list" class="list"></div>
+    </div>
+
+    <div id="player">
+        <div id="stage"></div>
+        <div class="controls">
+            <button class="btn" onclick="copyFull()">Salin Lirik</button>
+            <button class="btn" onclick="closePlayer()">Tutup</button>
+        </div>
+    </div>
+
+    <script>
+        const songs = [
+            { id: 1, title: "Penjaga Hati", artist: "Nadhif Basalamah", lyrics: ["Tak sadar ku temukan", "Temukan wanita rupawan yang sadarkan", "Dia seorang tiada lain, tiada bukan", "Hanya dia", "Dia buatku nyaman", "Dalam hangat pelukan", "Dia perasa yang mengerti yang ku rasa", "Hanya dia", "Kan kuarungi tujuh laut samudra", "Kan kudaki pegunungan Himalaya", "Apapun 'kan kulakukan 'tuk dirimu, sayang", "Oh, penjaga hati", "Kau dan aku sempurna", "Semoga ada cara 'tuk terus bersama", "Selalu ku tunggu, tak mau berlalu", "Kau dan aku", "Karena bersamamu semua terasa indah", "Gundah gulana hatiku t'lah hancur sirna", "Janjiku tak akan kulepas wahai kau bidadariku dari surga", "Tuk s'lamanya", "Tuk s'lamanya"] },
+            { id: 2, title: "33x", artist: "Perunggu", lyrics: ["Risalah terikatnya, batin dan raga yang mengunci", "Di atas Sang Maha Daya semua kendali terambil alih", "Jikalau kau keluhkan dengung sumbang yang mengganggu", "Buka lagi visimu, kau tahu mana urutan satu", "Di antara pusaran nirfungsi", "Petakan semua lagi, titik tuju yang t'lah terpatri", "Melamban bukanlah hal yang tabu", "Kadang itu yang kau butuh, bersandar hibahkan bebanmu", "Rotasikan pandanganmu, ambil sudut yang terbaru", "Belum pernah kau coba lihat semua bukan dari matamu", "Kelak kau kan mengingat yang membawamu ke sini", "Kami pernah di situ, di posisimu, helakan kesahmu", "Tak perlu kau berhenti kurasi", "Ini hanya sementara, bukan ujung dari rencana", "Jalanmu kan sepanjang niatmu", "Simpan tegar dalam hati, dua sembilan kau t'rus mencari", "Sebutlah nama-Nya, tetap di jalan-Nya", "Kelak kau mengingat, kau akan teringat", "Terus berenang, lanjutlah mendaki"] },
+            { id: 3, title: "Tujuh Belas", artist: "Tulus", lyrics: ["Muda jiwa selamanya muda", "Kisah kita abadi selamanya", "Masihkah kau mengingat di saat kita masih tujuh belas?", "Waktu di mana tanggal-tanggal merah terasa sungguh meriah", "Masihkah kau ingat cobaan terberat kita matematika?", "Masihkah engkau ingat lagu di radio yang merdu mengudara?", "Kita masih sebebas itu", "Rasa takut yang tak pernah mengganggu", "Batas naluri bahaya", "Dulu tingginya lebihi logika", "Putaran bumi dan waktu yang terus berjalan menempa kita", "Walau kini kita terpisah, namun jiwaku tetap di sana", "Sederas apa pun arus di hidupmu", "Genggam terus kenangan tentang kita", "Seberapa pun dewasa mengujimu", "Takkan lebih dari yang engkau bisa", "Dan kisah kita abadi untuk selama-lamanya"] },
+            { id: 4, title: "Kisah Tanpa Dirimu", artist: "Anggis Devaki", lyrics: ["Dari caramu bicara, telah buatku percaya", "Bahwa cinta itu ada, ku pantas dapatkannya", "Namun kini t'lah berbeda, kau bukan orang yang sama", "Ku besar hati mencoba, hapuskan pilu yang ada", "Hancurnya aku, ternyata kau tak cinta", "Kau tinggalkan aku, teganya hatimu", "Kau lupakan aku, seolah ku tak pernah ada di hatimu", "Akankah ku mampu?", "Menjalani kisah tanpa dirimu", "Semua yang t'lah ku jalani", "Kini tak berarti, kau sia-siakan aku", "Menjalani kisah tanpa dirimu", "Tanpa dirimu"] },
+            { id: 5, title: "Bergema Selamanya", artist: "Nadhif Basalamah", lyrics: ["Aku ingin jadi teman nyamanmu", "Tempat kau hilangkan keluh kesahmu", "Kita berbincang tak karuan tanpa beban", "Dan juga khayalan tentang masa depan", "Ku tak ingin cepat berlalu", "Waktu yang kupunya denganmu", "Kita berdansa dan tertawa, gandeng tangan", "Semoga bergema sampai selamanya", "Dunia pasti ada akhirnya", "Nikmati sementara yang ada", "Bersandar padaku taruh di bahuku", "Relakan semua bebas semaumu", "Kusampaikan dalam nyanyian", "Semoga bergema selamanya"] }
+        ];
+
+        let activeId = null; let stop = false;
+
+        function toggleTheme() {
+            const b = document.body;
+            const btn = document.getElementById('theme-toggle');
+            if (b.getAttribute('data-theme') === 'dark') {
+                b.setAttribute('data-theme', 'light');
+                btn.textContent = 'GELAP';
+            } else {
+                b.setAttribute('data-theme', 'dark');
+                btn.textContent = 'TERANG';
+            }
+        }
+
+        function render(data) {
+            document.getElementById('list').innerHTML = data.map(s => `
+                <div class="card" onclick="openPlayer(${s.id})">
+                    <div><h3>${s.title}</h3><p>${s.artist}</p></div>
+                    <span style="opacity:0.2">→</span>
+                </div>
+            `).join('');
+        }
+
+        async function openPlayer(id) {
+            const s = songs.find(x => x.id === id); activeId = id; stop = false;
+            document.getElementById('dashboard').style.opacity = '0';
+            setTimeout(async () => {
+                document.getElementById('player').style.display = 'flex';
+                const stage = document.getElementById('stage');
+                for (let line of s.lyrics) {
+                    if (stop) break;
+                    stage.innerHTML = "";
+                    line.split(" ").forEach(w => {
+                        const ws = document.createElement('span'); ws.className = 'word';
+                        w.split("").forEach(c => {
+                            const cs = document.createElement('span'); cs.className = 'char'; cs.textContent = c; ws.appendChild(cs);
+                        });
+                        stage.appendChild(ws);
+                    });
+                    const chars = stage.querySelectorAll('.char');
+                    chars.forEach((c, i) => setTimeout(() => c.classList.add('reveal'), i * 35));
+                    await new Promise(r => setTimeout(r, 2800));
+                    if (stop) break;
+                    chars.forEach(c => c.classList.add('exit'));
+                    await new Promise(r => setTimeout(r, 800));
+                }
+            }, 600);
+        }
+
+        function copyFull() {
+            const s = songs.find(x => x.id === activeId);
+            if(s) { 
+                navigator.clipboard.writeText(s.lyrics.join("\n")); 
+                alert("Berhasil menyalin seluruh lirik " + s.title); 
+            }
+        }
+
+        function closePlayer() { 
+            stop = true; 
+            document.getElementById('player').style.display = 'none'; 
+            document.getElementById('dashboard').style.opacity = '1'; 
+        }
+
+        function filter() { 
+            const q = document.getElementById('search').value.toLowerCase(); 
+            render(songs.filter(x => x.title.toLowerCase().includes(q) || x.artist.toLowerCase().includes(q))); 
+        }
+        
+        render(songs);
+    </script>
+</body>
+</html>
